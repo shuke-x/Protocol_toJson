@@ -107,7 +107,68 @@ function BuilderPage() {
     }));
   };
 
+  const buildVlessPayload = (values: FormState) => {
+    const toNumber = (val: unknown) => {
+      if (typeof val === "number") return val;
+      if (typeof val === "string" && val.trim() !== "") {
+        const num = Number(val);
+        return Number.isFinite(num) ? num : undefined;
+      }
+      return undefined;
+    };
+
+    const trimString = (val: unknown) => (typeof val === "string" ? val.trim() : "");
+
+    const listenPort = toNumber(values.listen_port);
+    const serverName = trimString(values.server_name);
+    const flowValue =
+      typeof values.flow === "string" && values.flow !== "none" ? values.flow : undefined;
+    const shortIds =
+      typeof values.short_id === "string" && values.short_id.trim() !== ""
+        ? values.short_id
+            .split(",")
+            .map((v) => v.trim())
+            .filter((v) => v.length > 0)
+        : [""];
+
+    const payload: Record<string, unknown> = {
+      type: "vless",
+      tag: trimString(values.tag),
+      listen: trimString(values.listen),
+      users: [
+        {
+          uuid: trimString(values.uuid),
+          name: trimString(values.name),
+          ...(flowValue ? { flow: flowValue } : {}),
+        },
+      ],
+      tls: {
+        enabled: Boolean(values.tls),
+        server_name: serverName,
+        reality: {
+          enabled: values.reality === undefined ? true : Boolean(values.reality),
+          handshake: {
+            server: serverName,
+            ...(listenPort !== undefined ? { port: listenPort } : {}),
+          },
+          private_key: trimString(values.private_key),
+          short_id: shortIds,
+        },
+      },
+    };
+
+    if (listenPort !== undefined) {
+      payload.listen_port = listenPort;
+    }
+
+    return payload;
+  };
+
   const buildPayload = (schema: ProtocolSchema, values: FormState) => {
+    if (schema.key === "vless") {
+      return buildVlessPayload(values);
+    }
+
     const payload: Record<string, unknown> = { type: schema.key };
 
     schema.fields.forEach((field) => {
@@ -284,10 +345,8 @@ function BuilderPage() {
       <div className="flex flex-col gap-4 rounded-2xl border border-white/5 bg-gradient-to-br from-white/5 via-white/2 to-white/0 p-6 shadow-[0_20px_70px_-40px_rgba(15,23,42,0.9)] backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="accent" className="animate-pulse-soft">
-            Schema-driven
+           JSON & QR batch
           </Badge>
-          <Badge variant="outline">React + Vite + Tailwind + shadcn</Badge>
-          <Badge variant="default">JSON & QR batch</Badge>
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-lg font-semibold text-primary">
@@ -295,7 +354,7 @@ function BuilderPage() {
             Config to JSON Toolkit
           </div>
           <p className="text-base text-muted-foreground max-w-3xl">
-            Multi-select protocols, fill forms, validate with Zod, and serialize to JSON or QR in one go.
+            Serialize to JSON or QR in one go.
             Login is optional; if signed in, your selections and form state are saved locally for convenience.
           </p>
         </div>
