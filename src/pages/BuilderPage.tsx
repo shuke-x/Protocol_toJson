@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useForm } from "@tanstack/react-form";
+import { useStore } from "@tanstack/react-store";
 import { QRCodeSVG } from "qrcode.react";
 import { ArrowRight, CheckCircle2, QrCode, Send, Sparkles } from "lucide-react";
 import { protocolSchemas, type FieldDefinition, type ProtocolKey, type ProtocolSchema } from "../config";
@@ -12,15 +14,13 @@ import { Select } from "../components/ui/select";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Switch } from "../components/ui/switch";
 import { cn } from "../lib/utils";
-import { useAuth } from "../context/AuthContext";
 import { UUID } from "uuidjs";
+import { loadBuilderState, saveBuilderState } from "../store/builderStore";
 
 type FormState = Record<string, string | number | boolean>;
 type ErrorState = Record<string, string | undefined>;
 type FormStateMap = Record<ProtocolKey, FormState>;
 type ErrorStateMap = Record<ProtocolKey, ErrorState>;
-
-const STORAGE_PREFIX = "ctj_state_";
 
 function emptyStates(): FormStateMap {
   return protocolSchemas.reduce((acc, schema) => {
@@ -44,68 +44,68 @@ function initialValues(schema: ProtocolSchema): FormState {
 }
 
 function BuilderPage() {
-  const { user } = useAuth();
-  const [activeKey, setActiveKey] = useState<ProtocolKey>(protocolSchemas[0].key);
-  const [selectedKeys, setSelectedKeys] = useState<ProtocolKey[]>([protocolSchemas[0].key]);
-  const [formStates, setFormStates] = useState<FormStateMap>(() => emptyStates());
+  const defaultState = {
+    formStates: emptyStates(),
+    selectedKeys: [protocolSchemas[0].key] as ProtocolKey[],
+    activeKey: protocolSchemas[0].key as ProtocolKey,
+  };
+
+  const initialState = loadBuilderState(defaultState);
+
+  const [activeKey, setActiveKey] = useState<ProtocolKey>(initialState.activeKey);
+  const [selectedKeys, setSelectedKeys] = useState<ProtocolKey[]>(initialState.selectedKeys);
+  const [formStates, setFormStates] = useState<FormStateMap>(() => initialState.formStates);
   const [errors, setErrors] = useState<ErrorStateMap>({});
   const [jsonOutput, setJsonOutput] = useState("// JSON will appear here");
   const [qrValue, setQrValue] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  // Load persisted state on login, fallback to defaults for guests.
   useEffect(() => {
-    if (!user) {
-      setFormStates(emptyStates());
-      setSelectedKeys([protocolSchemas[0].key]);
-      setActiveKey(protocolSchemas[0].key);
-      return;
-    }
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${user.username}`);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        setFormStates({ ...emptyStates(), ...(parsed.formStates ?? {}) });
-        setSelectedKeys(parsed.selectedKeys ?? [protocolSchemas[0].key]);
-        setActiveKey(parsed.activeKey ?? protocolSchemas[0].key);
-        return;
-      } catch {
-        // fallthrough to defaults
-      }
-    }
-    setFormStates(emptyStates());
-    setSelectedKeys([protocolSchemas[0].key]);
-    setActiveKey(protocolSchemas[0].key);
-  }, [user]);
-
-  // Persist state when logged in
-  useEffect(() => {
-    if (!user) return;
-    const payload = { formStates, selectedKeys, activeKey };
-    localStorage.setItem(`${STORAGE_PREFIX}${user.username}`, JSON.stringify(payload));
-  }, [user, formStates, selectedKeys, activeKey]);
+    saveBuilderState({ formStates, selectedKeys, activeKey });
+  }, [formStates, selectedKeys, activeKey]);
 
   const activeSchema = useMemo(
     () => protocolSchemas.find((s) => s.key === activeKey) ?? protocolSchemas[0],
     [activeKey],
   );
 
-  const getFormValues = (schemaKey: ProtocolKey) =>
-    formStates[schemaKey] ??
-    initialValues(protocolSchemas.find((s) => s.key === schemaKey) ?? protocolSchemas[0]);
+  const getStoredValues = useCallback(
+    (schemaKey: ProtocolKey) =>
+      formStates[schemaKey] ??
+      initialValues(protocolSchemas.find((s) => s.key === schemaKey) ?? protocolSchemas[0]),
+    [formStates],
+  );
 
-  const handleFieldChange = (field: FieldDefinition, value: string | boolean) => {
-    setFormStates((prev) => ({
-      ...prev,
-      [activeSchema.key]: {
-        ...getFormValues(activeSchema.key),
-        [field.name]: value,
-      },
-    }));
-    setErrors((prev) => ({
-      ...prev,
-      [activeSchema.key]: { ...(prev[activeSchema.key] ?? {}), [field.name]: undefined },
-    }));
+  const form = useForm({
+    defaultValues: getStoredValues(activeSchema.key) as FormState,
+  });
+
+  const activeValues = useStore(form.store, (state) => state.values as FormState);
+
+  // Keep form in sync when switching protocols
+  useEffect(() => {
+    const stored = getStoredValues(activeSchema.key);
+    form.reset(stored);
+    setErrors((prev) => ({ ...prev, [activeSchema.key]: {} }));
+  }, [activeSchema.key, form, getStoredValues]);
+
+  // Persist active form values into shared map for multi-protocol state
+  useEffect(() => {
+    setFormStates((prev) => {
+      const stored = prev[activeSchema.key] ??
+        initialValues(protocolSchemas.find((s) => s.key === activeSchema.key) ?? protocolSchemas[0]);
+      return {
+        ...prev,
+        [activeSchema.key]: { ...stored, ...(activeValues as FormState) },
+      };
+    });
+  }, [activeSchema.key, activeValues]);
+
+  const getFormValues = (schemaKey: ProtocolKey) => {
+    if (schemaKey === activeSchema.key) {
+      return (activeValues as FormState) ?? getStoredValues(schemaKey);
+    }
+    return getStoredValues(schemaKey);
   };
 
   const buildVlessPayload = (values: FormState) => {
@@ -271,114 +271,168 @@ function BuilderPage() {
   };
 
   const renderField = (field: FieldDefinition) => {
-    const formValues = getFormValues(activeSchema.key);
-    const value = formValues ? formValues[field.name] : "";
-    const error = errors[activeSchema.key]?.[field.name];
-    const label = (
-      <div className="flex items-center justify-between">
-        <Label htmlFor={`${activeSchema.key}-${field.name}`}>
-          {field.label}
-          {
-            field.required ? <span className="text-destructive ml-1">*</span> : null
-          }
-        </Label>
-      </div>
+    const storedValue = getFormValues(activeSchema.key)[field.name];
+    const renderLabel = () => (
+      <Label htmlFor={`${activeSchema.key}-${field.name}`}>
+        {field.label}
+        {field.required ? <span className="text-destructive ml-1">*</span> : null}
+      </Label>
     );
+    const renderError = (fallback?: string, helper?: string) => {
+      const message = errors[activeSchema.key]?.[field.name] ?? fallback;
+      return <div>
+        {message ? <p className="text-xs text-destructive">{message}</p> : null}
+        {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
+      </div>
+    };
 
     if (field.type === "checkbox") {
       return (
-        <div className="flex flex-col gap-1">
-          {label}
-          <div className="flex items-start justify-between rounded-lg border border-border/70 bg-white/5 px-4 py-3">
-            {field.label}
-            <Switch
-              id={`${activeSchema.key}-${field.name}`}
-              checked={Boolean(value)}
-              onCheckedChange={(checked) => handleFieldChange(field, checked)}
-            />
-          </div>
-          {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-        </div>
+        <form.Field
+          name={field.name as keyof FormState}
+          defaultValue={Boolean(storedValue)}
+          validators={field.required ? { onChange: (value) => (!value ? "required" : undefined) } : undefined}
+        >
+          {(fieldApi) => (
+            <>
+              <div className="flex flex-col gap-1">
+                {renderLabel()}
+                <div className="flex items-center justify-between rounded-lg border border-border/70 bg-white/5 px-4 py-3">
+                  <span className="text-sm font-semibold text-foreground">{field.label}</span>
+                  <Switch
+                    id={`${activeSchema.key}-${field.name}`}
+                    checked={Boolean(fieldApi.state.value)}
+                    onCheckedChange={(checked) => fieldApi.setValue(checked)}
+                  />
+                </div>
 
+                {renderError(fieldApi.state.meta.errors?.[0], field.helper)}
+              </div>
+            </>
+          )}
+        </form.Field>
       );
     }
 
     if (field.type === "textarea") {
       return (
-        <div className="flex flex-col gap-2">
-          {label}
-          <Textarea
-            id={`${activeSchema.key}-${field.name}`}
-            placeholder={field.placeholder}
-            value={typeof value === "string" ? value : ""}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-          />
-          {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-        </div>
+        <form.Field
+          name={field.name as keyof FormState}
+          defaultValue={typeof storedValue === "string" ? storedValue : ""}
+          validators={field.required ? { onChange: (value) => (!value ? "必填" : undefined) } : undefined}
+        >
+          {(fieldApi) => (
+            <div className="flex flex-col gap-2">
+              {renderLabel()}
+              <Textarea
+                id={`${activeSchema.key}-${field.name}`}
+                placeholder={field.placeholder}
+                value={typeof fieldApi.state.value === "string" ? fieldApi.state.value : ""}
+                onChange={(e) => fieldApi.handleChange(e.target.value)}
+                onBlur={fieldApi.handleBlur}
+              />
+
+              {renderError(fieldApi.state.meta.errors?.[0], field.helper)}
+            </div>
+          )}
+        </form.Field>
       );
     }
 
     if (field.type === "select") {
       return (
-        <div className="flex flex-col gap-2">
-          {label}
-          <Select
-            id={`${activeSchema.key}-${field.name}`}
-            value={String(value ?? "")}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-          >
-            {field.options?.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </Select>
-          {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-        </div>
+        <form.Field
+          name={field.name as keyof FormState}
+          defaultValue={String(storedValue ?? "")}
+          validators={field.required ? { onChange: (value) => (!value ? "必选" : undefined) } : undefined}
+        >
+          {(fieldApi) => (
+            <div className="flex flex-col gap-2">
+              {renderLabel()}
+              <Select
+                id={`${activeSchema.key}-${field.name}`}
+                value={String(fieldApi.state.value ?? "")}
+                onChange={(e) => fieldApi.handleChange(e.target.value)}
+                onBlur={fieldApi.handleBlur}
+              >
+                {field.options?.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </Select>
+
+              {renderError(fieldApi.state.meta.errors?.[0], field.helper)}
+            </div>
+          )}
+        </form.Field>
       );
     }
-    if (field.name === 'uuid') {
+
+    if (field.name === "uuid") {
       return (
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-start items-center w-full gap-2">
-            {label}
-            <button type="button" onClick={
-              () => {
-                const uuid = UUID.generate()
-                handleFieldChange(field, uuid);
-              }
-            } className="h-5 rounded-md flex justify-center items-center  px-3 py-3 text-left transition-colors bg-primary/10 text-primary hover:bg-primary/20 text-xs">
-              Create UUID
-            </button>
-          </div>
-          <Input
-            id={`${activeSchema.key}-${field.name}`}
-            type={field.type === "number" ? "number" : "text"}
-            placeholder={field.placeholder}
-            value={typeof value === "string" ? value : ""}
-            min={field.min}
-            max={field.max}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-          />
-          {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-        </div >
-      )
+        <form.Field
+          name={field.name as keyof FormState}
+          defaultValue={typeof storedValue === "string" ? storedValue : ""}
+          validators={{ onChange: (value) => (!value ? "必填" : undefined) }}
+        >
+          {(fieldApi) => (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                {renderLabel()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const uuid = UUID.generate();
+                    fieldApi.setValue(uuid);
+                  }}
+                  className="h-9 rounded-md px-3 text-xs font-semibold transition-colors bg-primary/10 text-primary hover:bg-primary/20"
+                >
+                  Create UUID
+                </button>
+              </div>
+              <Input
+                id={`${activeSchema.key}-${field.name}`}
+                type={field.type === "number" ? "number" : "text"}
+                placeholder={field.placeholder}
+                value={typeof fieldApi.state.value === "string" ? fieldApi.state.value : ""}
+                min={field.min}
+                max={field.max}
+                onChange={(e) => fieldApi.handleChange(e.target.value)}
+                onBlur={fieldApi.handleBlur}
+              />
+              {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
+              {renderError(fieldApi.state.meta.errors?.[0])}
+            </div>
+          )}
+        </form.Field>
+      );
     }
 
     return (
-      <div className="flex flex-col gap-2">
-        {label}
-        <Input
-          id={`${activeSchema.key}-${field.name}`}
-          type={field.type === "number" ? "number" : "text"}
-          placeholder={field.placeholder}
-          value={typeof value === "string" ? value : ""}
-          min={field.min}
-          max={field.max}
-          onChange={(e) => handleFieldChange(field, e.target.value)}
-        />
-        {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-      </div>
+      <form.Field
+        name={field.name as keyof FormState}
+        defaultValue={typeof storedValue === "string" ? storedValue : ""}
+        validators={field.required ? { onChange: (value) => (!value ? "必填" : undefined) } : undefined}
+      >
+        {(fieldApi) => (
+          <div className="flex flex-col gap-2">
+            {renderLabel()}
+            <Input
+              id={`${activeSchema.key}-${field.name}`}
+              type={field.type === "number" ? "number" : "text"}
+              placeholder={field.placeholder}
+              value={typeof fieldApi.state.value === "string" ? fieldApi.state.value : ""}
+              min={field.min}
+              max={field.max}
+              onChange={(e) => fieldApi.handleChange(e.target.value)}
+              onBlur={fieldApi.handleBlur}
+            />
+            {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
+            {renderError(fieldApi.state.meta.errors?.[0])}
+          </div>
+        )}
+      </form.Field>
     );
   };
 
@@ -397,7 +451,7 @@ function BuilderPage() {
           </div>
           <p className="text-base text-muted-foreground max-w-3xl">
             Serialize to JSON or QR in one go.
-            Login is optional; if signed in, your selections and form state are saved locally for convenience.
+            配置状态自动保存在本地，无需登录。
           </p>
         </div>
       </div>

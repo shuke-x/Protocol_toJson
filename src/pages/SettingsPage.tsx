@@ -3,25 +3,21 @@ import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
-import { useAuth } from "../context/AuthContext";
 
 function SettingsPage() {
-  const { user } = useAuth();
   return (
     <div className="max-w-2xl space-y-4">
       <Card className="border-white/5 bg-white/5">
         <CardHeader>
           <CardTitle>Account Settings</CardTitle>
           <CardDescription>
-            Placeholder for password updates and profile settings. Login is optional; data stays on this device.
+            本地模式下暂无账户体系，这里预留接口供接入真实后端时使用。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2 text-sm">
-            <Badge variant="outline">{user ? `Logged in as ${user.username}` : "Guest mode"}</Badge>
-            <span className="text-muted-foreground">
-              Sync is local-only; replace this with real API calls when backend is ready.
-            </span>
+            <Badge variant="outline">本地模式</Badge>
+            <span className="text-muted-foreground">数据仅保存在浏览器，可接入 API 后再开启账号登录。</span>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">

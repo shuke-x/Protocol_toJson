@@ -1,20 +1,14 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
-import { LogOut, Settings, Sparkles, UserRound, Wrench, KeyRound, Home } from "lucide-react";
+import { Settings, Sparkles, Wrench, Home } from "lucide-react";
 
 const navItems = [
   { to: "/builder", label: "Protocol Builder", icon: Sparkles },
-  { to: "/settings", label: "Settings", icon: Settings },
-  { to: "/login", label: "Login", icon: KeyRound },
-  { to: "/register", label: "Register", icon: UserRound },
 ];
 
 function ShellLayout() {
-  const { user, logout } = useAuth();
-  const nav = useNavigate();
   const location = useLocation();
 
   return (
@@ -37,8 +31,6 @@ function ShellLayout() {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.to;
-                const hiddenForAuth = user && (item.to === "/login" || item.to === "/register");
-                if (hiddenForAuth) return null;
                 return (
                   <NavLink
                     key={item.to}
@@ -55,38 +47,6 @@ function ShellLayout() {
                   </NavLink>
                 );
               })}
-            </div>
-
-            <div className="mt-6 rounded-lg border border-border/60 bg-slate-900/50 p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-primary" />
-                  <span className="font-semibold">Quick actions</span>
-                </div>
-                <Badge variant="outline">beta</Badge>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Auth is optional. Log in to remember your form states and selections across sessions.
-              </p>
-              {user ? (
-                <Button
-                  variant="ghost"
-                  className="mt-3 w-full gap-2 border border-border/60 bg-white/5"
-                  onClick={() => logout()}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout ({user.username})
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  className="mt-3 w-full gap-2 border border-border/60 bg-white/5"
-                  onClick={() => nav("/login")}
-                >
-                  <KeyRound className="h-4 w-4" />
-                  Sign in to sync
-                </Button>
-              )}
             </div>
           </aside>
 
