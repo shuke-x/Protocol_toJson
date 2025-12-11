@@ -22,9 +22,39 @@ export type ProtocolSchema = {
   description: string;
   fields: FieldDefinition[];
   zodShape: z.ZodTypeAny;
+  zodOutputShape?: z.ZodTypeAny;
 };
 
 const uuidRegex = /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/;
+
+const vlessOutputShape = z.object({
+  type: z.literal("vless"),
+  tag: z.string().min(1, "Tag is required"),
+  listen: z.string().min(1, "Listen is required"),
+  listen_port: z.number().int().min(1).max(65535),
+  users: z
+    .array(
+      z.object({
+        uuid: z.string().regex(uuidRegex, "UUID format looks off"),
+        flow: z.enum(["xtls-rprx-vision", "xtls-rprx-splice", "none"]).optional(),
+        name: z.string().min(1, "User name is required"),
+      }),
+    )
+    .min(1, "At least one user is required"),
+  tls: z.object({
+    enabled: z.boolean(),
+    server_name: z.string().min(1, "Server name is required"),
+    reality: z.object({
+      enabled: z.boolean(),
+      handshake: z.object({
+        server: z.string().min(1, "Handshake server is required"),
+        port: z.number().int().min(1).max(65535).optional(),
+      }),
+      private_key: z.string().min(1, "Private key is required"),
+      short_id: z.array(z.string()),
+    }),
+  }),
+});
 
 export const protocolSchemas: ProtocolSchema[] = [
   {
@@ -112,34 +142,23 @@ export const protocolSchemas: ProtocolSchema[] = [
         placeholder: "comma separated, e.g. a1,b2",
       },
     ],
+    // 针对表单输入本身做校验，而不是构建后的 JSON 结构，便于逐字段报错
     zodShape: z.object({
       type: z.literal("vless"),
-      tag: z.string().min(1, "Tag is required"),
-      listen: z.string().min(1, "Listen is required"),
-      listen_port: z.number().int().min(1).max(65535),
-      users: z
-        .array(
-          z.object({
-            uuid: z.string().regex(uuidRegex, "UUID format looks off"),
-            flow: z.enum(["xtls-rprx-vision", "xtls-rprx-splice", "none"]).optional(),
-            name: z.string().min(1, "User name is required"),
-          }),
-        )
-        .min(1, "At least one user is required"),
-      tls: z.object({
-        enabled: z.boolean(),
-        server_name: z.string().min(1, "Server name is required"),
-        reality: z.object({
-          enabled: z.boolean(),
-          handshake: z.object({
-            server: z.string().min(1, "Handshake server is required"),
-            port: z.number().int().min(1).max(65535),
-          }),
-          private_key: z.string().min(1, "Private key is required"),
-          short_id: z.array(z.string()),
-        }),
-      }),
+      tag: z.string().trim().min(1, "Tag is required"),
+      listen: z.string(),
+      listen_port: z.coerce.number().int().min(1).max(65535),
+      name: z.string().trim().min(1, "User name is required"),
+      uuid: z.string().trim().regex(uuidRegex, "UUID format looks off"),
+      flow: z.enum(["xtls-rprx-vision", "xtls-rprx-splice", "none"]).optional(),
+      tls: z.boolean(),
+      server_name: z.string().trim().min(1, "Server name is required"),
+      reality: z.boolean(),
+      private_key: z.string().trim().min(1, "Private key is required"),
+      short_id: z.string().optional(),
     }),
+    // 导出 JSON 的最终结构校验
+    zodOutputShape: vlessOutputShape,
   },
   {
     key: "vmess",

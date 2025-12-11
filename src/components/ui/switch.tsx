@@ -24,7 +24,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         data-state={checked ? "checked" : "unchecked"}
         onClick={handleClick}
         className={cn(
-          "group peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all duration-200 ease-out",
+          "group peer inline-flex h-4 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all duration-200 ease-out",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:cursor-not-allowed disabled:opacity-50",
           checked

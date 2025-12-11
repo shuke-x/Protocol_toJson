@@ -213,18 +213,39 @@ function BuilderPage() {
       if (!schema) return;
       const values = getFormValues(key);
       const payload = buildPayload(schema, values);
-      const parseResult = schema.zodShape.safeParse(payload);
-      if (!parseResult.success) {
+
+      // 表单层校验：VLESS 用原始字段，其它协议使用转换后的 payload
+      const parseTarget = schema.key === "vless" ? values : payload;
+      const formParse = schema.zodShape.safeParse(parseTarget);
+      if (!formParse.success) {
         hasError = true;
         const fieldErrors: ErrorState = {};
-        parseResult.error.issues.forEach((issue) => {
+        formParse.error.issues.forEach((issue) => {
           const path = issue.path[0] as string;
           fieldErrors[path] = issue.message;
         });
         newErrors[key] = fieldErrors;
         return;
       }
-      payloads.push(parseResult.data);
+
+      // 导出层校验（仅当提供 output schema 时）
+      if (schema.zodOutputShape) {
+        const outputParse = schema.zodOutputShape.safeParse(payload);
+        if (!outputParse.success) {
+          hasError = true;
+          const fieldErrors: ErrorState = {};
+          outputParse.error.issues.forEach((issue) => {
+            const path = issue.path.join(".") || "output";
+            fieldErrors[path] = issue.message;
+          });
+          newErrors[key] = fieldErrors;
+          return;
+        }
+        payloads.push(outputParse.data);
+        return;
+      }
+
+      payloads.push(formParse.data);
     });
 
     setErrors(newErrors);
@@ -241,6 +262,8 @@ function BuilderPage() {
   const onGenerateJson = () => {
 
     const serialized = validateAll();
+    console.log(serialized);
+    
     if (serialized) {
       setQrValue(serialized);
       setSubmitted(false);
@@ -280,10 +303,12 @@ function BuilderPage() {
     );
     const renderError = (fallback?: string, helper?: string) => {
       const message = errors[activeSchema.key]?.[field.name] ?? fallback;
-      return <div>
-        {message ? <p className="text-xs text-destructive">{message}</p> : null}
-        {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
-      </div>
+      return (
+        <div>
+          {message ? <p className="text-xs text-destructive">{message}</p> : null}
+          {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
+        </div>
+      );
     };
 
     if (field.type === "checkbox") {
@@ -295,9 +320,9 @@ function BuilderPage() {
         >
           {(fieldApi) => (
             <>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-2">
                 {renderLabel()}
-                <div className="flex items-center justify-between rounded-lg border border-border/70 bg-white/5 px-4 py-3">
+                <div className="h-10 flex items-center justify-between rounded-lg border border-border/70 bg-white/5 px-4">
                   <span className="text-sm font-semibold text-foreground">{field.label}</span>
                   <Switch
                     id={`${activeSchema.key}-${field.name}`}
@@ -386,7 +411,7 @@ function BuilderPage() {
                     const uuid = UUID.generate();
                     fieldApi.setValue(uuid);
                   }}
-                  className="h-9 rounded-md px-3 text-xs font-semibold transition-colors bg-primary/10 text-primary hover:bg-primary/20"
+                  className="h-4 rounded-md px-3 text-xs font-semibold transition-colors bg-primary/10 text-primary hover:bg-primary/20"
                 >
                   Create UUID
                 </button>
@@ -401,8 +426,7 @@ function BuilderPage() {
                 onChange={(e) => fieldApi.handleChange(e.target.value)}
                 onBlur={fieldApi.handleBlur}
               />
-              {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-              {renderError(fieldApi.state.meta.errors?.[0])}
+              {renderError(fieldApi.state.meta.errors?.[0], field.helper)}
             </div>
           )}
         </form.Field>
@@ -428,8 +452,7 @@ function BuilderPage() {
               onChange={(e) => fieldApi.handleChange(e.target.value)}
               onBlur={fieldApi.handleBlur}
             />
-            {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
-            {renderError(fieldApi.state.meta.errors?.[0])}
+            {renderError(fieldApi.state.meta.errors?.[0],field.helper)}
           </div>
         )}
       </form.Field>
