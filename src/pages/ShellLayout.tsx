@@ -18,18 +18,18 @@ function ShellLayout() {
   const location = useLocation();
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-foreground">
+    <div className="relative h-screen overflow-hidden bg-slate-950 text-foreground">
       <div className="glow" />
-      <div className=" relative z-10 py-8">
-        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="rounded-2xl border border-white/5 bg-white/5 p-5 backdrop-blur-lg shadow-[0_20px_70px_-50px_rgba(15,23,42,0.9)]">
+      <div className="relative z-10 flex h-full flex-col py-8 px-4 sm:px-6 lg:px-10">
+        <div className="grid h-full min-h-0 gap-6 lg:grid-cols-[260px_1fr]">
+          <aside className="h-full min-h-0 overflow-auto rounded-2xl border border-white/5 bg-white/5 p-5 backdrop-blur-lg shadow-[0_20px_70px_-50px_rgba(15,23,42,0.9)]">
             <div className="flex items-center gap-3 pb-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 text-slate-900 shadow-inner">
                 <Home className="h-6 w-6 text-primary" />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-muted-foreground">Config to JSON</span>
-                <span className="text-base font-semibold">Toolkit</span>
+                <span className="text-base font-semibold">Sing-Box</span>
+                <span className="text-sm font-semibold text-muted-foreground">Protocol to JSON</span>
               </div>
             </div>
 
@@ -90,7 +90,7 @@ function ShellLayout() {
             </div>
           </aside>
 
-          <main>
+          <main className="min-h-0 overflow-auto pr-1">
             <Outlet />
           </main>
         </div>

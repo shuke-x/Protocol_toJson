@@ -8,11 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { Checkbox } from "../components/ui/checkbox";
 import { Select } from "../components/ui/select";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { Switch } from "../components/ui/switch";
 import { cn } from "../lib/utils";
 import { useAuth } from "../context/AuthContext";
+import { UUID } from "uuidjs";
 
 type FormState = Record<string, string | number | boolean>;
 type ErrorState = Record<string, string | undefined>;
@@ -126,9 +127,9 @@ function BuilderPage() {
     const shortIds =
       typeof values.short_id === "string" && values.short_id.trim() !== ""
         ? values.short_id
-            .split(",")
-            .map((v) => v.trim())
-            .filter((v) => v.length > 0)
+          .split(",")
+          .map((v) => v.trim())
+          .filter((v) => v.length > 0)
         : [""];
 
     const payload: Record<string, unknown> = {
@@ -238,6 +239,7 @@ function BuilderPage() {
   };
 
   const onGenerateJson = () => {
+
     const serialized = validateAll();
     if (serialized) {
       setQrValue(serialized);
@@ -261,6 +263,13 @@ function BuilderPage() {
     }
   };
 
+  const toggleSelection = (key: ProtocolKey) => {
+    setSelectedKeys((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      return next.length === 0 ? prev : (next as ProtocolKey[]);
+    });
+  };
+
   const renderField = (field: FieldDefinition) => {
     const formValues = getFormValues(activeSchema.key);
     const value = formValues ? formValues[field.name] : "";
@@ -269,22 +278,28 @@ function BuilderPage() {
       <div className="flex items-center justify-between">
         <Label htmlFor={`${activeSchema.key}-${field.name}`}>
           {field.label}
-          {field.required ? " *" : ""}
+          {
+            field.required ? <span className="text-destructive ml-1">*</span> : null
+          }
         </Label>
-        {error ? <span className="text-xs text-destructive">{error}</span> : null}
       </div>
     );
 
     if (field.type === "checkbox") {
       return (
-        <div className="rounded-lg border border-border/70 bg-white/5 p-3">
-          <Checkbox
-            checked={Boolean(value)}
-            onChange={(e) => handleFieldChange(field, e.target.checked)}
-            title={field.label}
-          />
-          {field.helper ? <p className="mt-1 text-xs text-muted-foreground">{field.helper}</p> : null}
+        <div className="flex flex-col gap-1">
+          {label}
+          <div className="flex items-start justify-between rounded-lg border border-border/70 bg-white/5 px-4 py-3">
+            {field.label}
+            <Switch
+              id={`${activeSchema.key}-${field.name}`}
+              checked={Boolean(value)}
+              onCheckedChange={(checked) => handleFieldChange(field, checked)}
+            />
+          </div>
+          {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
         </div>
+
       );
     }
 
@@ -322,6 +337,33 @@ function BuilderPage() {
         </div>
       );
     }
+    if (field.name === 'uuid') {
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-start items-center w-full gap-2">
+            {label}
+            <button type="button" onClick={
+              () => {
+                const uuid = UUID.generate()
+                handleFieldChange(field, uuid);
+              }
+            } className="h-5 rounded-md flex justify-center items-center  px-3 py-3 text-left transition-colors bg-primary/10 text-primary hover:bg-primary/20 text-xs">
+              Create UUID
+            </button>
+          </div>
+          <Input
+            id={`${activeSchema.key}-${field.name}`}
+            type={field.type === "number" ? "number" : "text"}
+            placeholder={field.placeholder}
+            value={typeof value === "string" ? value : ""}
+            min={field.min}
+            max={field.max}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+          />
+          {field.helper ? <p className="text-xs text-muted-foreground">{field.helper}</p> : null}
+        </div >
+      )
+    }
 
     return (
       <div className="flex flex-col gap-2">
@@ -341,17 +383,17 @@ function BuilderPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full flex-col space-y-6 overflow-y-auto">
       <div className="flex flex-col gap-4 rounded-2xl border border-white/5 bg-gradient-to-br from-white/5 via-white/2 to-white/0 p-6 shadow-[0_20px_70px_-40px_rgba(15,23,42,0.9)] backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="accent" className="animate-pulse-soft">
-           JSON & QR batch
+            JSON & QR batch
           </Badge>
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-lg font-semibold text-primary">
             <Sparkles size={18} />
-            Config to JSON Toolkit
+            Sing-box Config to JSON Toolkit
           </div>
           <p className="text-base text-muted-foreground max-w-3xl">
             Serialize to JSON or QR in one go.
@@ -360,51 +402,56 @@ function BuilderPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1.5fr)_340px]">
-          <Card className="h-full">
+      <div className="grid min-h-0 gap-4 lg:grid-cols-[280px_minmax(0,1.5fr)_340px]">
+        <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle>Protocols</CardTitle>
             <CardDescription>Multi-select for batch JSON/QR export.</CardDescription>
           </CardHeader>
-          <CardContent className="pt-2">
-            <ScrollArea className="space-y-3">
+          <CardContent className="flex flex-1 flex-col py-2">
+            <ScrollArea className="flex-1 space-y-3 w-full">
               {protocolSchemas.map((schema) => {
                 const selected = selectedKeys.includes(schema.key);
                 const schemaErrors = errors[schema.key];
                 return (
                   <button
                     key={schema.key}
+                    type="button"
                     onClick={() => setActiveKey(schema.key)}
                     className={cn(
-                      "w-full rounded-lg border px-3 py-3 text-left transition-all flex items-start gap-3",
+                      "w-full rounded-xl border px-3 py-3 text-left transition-colors flex flex-col items-start gap-3",
+                      selected ? "!border-primary/40 " : '',
                       activeKey === schema.key
-                        ? "border-primary/60 bg-primary/10 text-foreground shadow-sm"
-                        : "border-border/70 bg-white/5 text-muted-foreground hover:border-border/40 hover:text-foreground",
+                        ? "border-primary/80 bg-primary/10 text-foreground shadow-sm"
+                        : "border-border/70 bg-white/5 text-muted-foreground hover:border-primary/30 hover:text-foreground",
                     )}
                   >
-                    <input
-                      type="checkbox"
-                      className="mt-[2px] h-4 w-4 rounded border border-border/80 bg-white/5 text-primary focus:ring-primary"
-                      checked={selected}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setSelectedKeys((prev) => {
-                          const next = prev.includes(schema.key)
-                            ? prev.filter((k) => k !== schema.key)
-                            : [...prev, schema.key];
-                          return next.length === 0 ? prev : (next as ProtocolKey[]);
-                        });
-                      }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold">{schema.label}</span>
-                        <span className="text-xs text-muted-foreground">{schema.fields.length} fields</span>
+                    <div className="w-full flex justify-between space-x-4 items-center">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelection(schema.key);
+                        }}
+                        className={cn(
+                          "mt-[2px] h-3 w-3 rounded-full border transition-colors",
+                          selected
+                            ? "border-primary/70 bg-primary/40 shadow-[0_0_0_3px_rgba(127,245,197,0.15)]"
+                            : "border-border/80 bg-white/10",
+                        )}
+                      />
+
+                      <div className="flex-1 pr-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">{schema.label}</span>
+                          <span className="text-xs text-muted-foreground">{schema.fields.length} fields</span>
+                        </div>
+                        {schemaErrors ? (
+                          <p className="mt-1 text-xs text-destructive">Has validation issues</p>
+                        ) : null}
                       </div>
+                    </div>
+                    <div>
                       <p className="mt-1 text-xs text-muted-foreground">{schema.description}</p>
-                      {schemaErrors ? (
-                        <p className="mt-1 text-xs text-destructive">Has validation issues</p>
-                      ) : null}
                     </div>
                   </button>
                 );
@@ -413,7 +460,7 @@ function BuilderPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -423,7 +470,7 @@ function BuilderPage() {
               <Badge variant="outline">{activeSchema.fields.length} fields</Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="flex flex-1 flex-col space-y-5 overflow-auto">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {activeSchema.fields.map((field) => (
                 <div key={field.name} className="animate-fade-in">
@@ -438,20 +485,6 @@ function BuilderPage() {
               </div>
             ) : null}
 
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={onGenerateJson} className="gap-2">
-                <Sparkles size={16} />
-                Generate JSON
-              </Button>
-              <Button variant="secondary" onClick={onGenerateQr} className="gap-2">
-                <QrCode size={16} />
-                Generate QR
-              </Button>
-              <Button variant="ghost" onClick={onSubmit} className="gap-2">
-                <Send size={16} />
-                Submit
-              </Button>
-            </div>
 
             {submitted ? (
               <div className="flex items-center gap-2 text-sm text-primary">
@@ -462,8 +495,8 @@ function BuilderPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
-          <CardHeader>
+        <Card className="flex h-full flex-col">
+          <CardHeader className="flex flex-col space-y-2">
             <div className="flex items-center justify-between">
               <CardTitle>Output</CardTitle>
               <Badge variant="accent" className="gap-1">
@@ -472,9 +505,25 @@ function BuilderPage() {
                 JSON/QR
               </Badge>
             </div>
+
             <CardDescription>Serialized JSON plus QR for scanning.</CardDescription>
+            <div className="flex flex-wrap justify-between gap-2">
+              <Button onClick={onGenerateJson} className="gap-1">
+                <Sparkles size={8} />
+                Generate JSON
+              </Button>
+              <Button variant="secondary" onClick={onGenerateQr} className="gap-1">
+                <QrCode size={8} />
+                Generate QR
+              </Button>
+              {/* <Button variant="ghost" onClick={onSubmit} className="gap-2">
+                <Send size={16} />
+                Submit
+              </Button> */}
+            </div>
+
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex flex-1 flex-col space-y-4 overflow-auto">
             <div className="rounded-md border border-border/70 bg-slate-900/60 p-3 font-mono text-xs text-emerald-200 shadow-inner min-h-[200px]">
               <pre className="whitespace-pre-wrap break-words">{jsonOutput}</pre>
             </div>
