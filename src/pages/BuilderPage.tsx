@@ -262,7 +262,6 @@ function BuilderPage() {
   const onGenerateJson = () => {
 
     const serialized = validateAll();
-    console.log(serialized, 'ccc');
 
     if (serialized) {
       setQrValue(serialized);
