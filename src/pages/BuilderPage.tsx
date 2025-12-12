@@ -262,8 +262,8 @@ function BuilderPage() {
   const onGenerateJson = () => {
 
     const serialized = validateAll();
-    console.log(serialized);
-    
+    console.log(serialized, 'ccc');
+
     if (serialized) {
       setQrValue(serialized);
       setSubmitted(false);
@@ -452,7 +452,7 @@ function BuilderPage() {
               onChange={(e) => fieldApi.handleChange(e.target.value)}
               onBlur={fieldApi.handleBlur}
             />
-            {renderError(fieldApi.state.meta.errors?.[0],field.helper)}
+            {renderError(fieldApi.state.meta.errors?.[0], field.helper)}
           </div>
         )}
       </form.Field>
