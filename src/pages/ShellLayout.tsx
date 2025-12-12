@@ -1,11 +1,10 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
-import { Settings, Sparkles, Wrench, Home } from "lucide-react";
+import { Sparkles, Home, Globe2 } from "lucide-react";
 
 const navItems = [
   { to: "/builder", label: "Protocol Builder", icon: Sparkles },
+  { to: "/dns", label: "DNS Router", icon: Globe2 },
 ];
 
 function ShellLayout() {

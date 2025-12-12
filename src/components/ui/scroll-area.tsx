@@ -7,7 +7,7 @@ const ScrollArea = React.forwardRef<
 >(({ className, style, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("overflow-auto", className)}
+    className={cn("overflow-auto overscroll-contain", className)}
     style={{ scrollbarWidth: "thin", ...style }}
     {...props}
   />
