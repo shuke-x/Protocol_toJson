@@ -283,8 +283,8 @@ function DnsPage() {
         </div>
       </div>
 
-      <div className=" min-h-0  lg:grid-cols-[1.4fr_1fr] space-y-4">
-        <div className="flex justify-start items-center gap-4">
+      <div className=" min-h-0 lg:grid-cols-[1.4fr_1fr] space-y-4 ">
+        <div className="grid gap-5">
           <EditableTable
             title="Servers"
             description="填写 DNS 服务器的 tag、地址与 detour。"
