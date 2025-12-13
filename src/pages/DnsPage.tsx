@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Copy } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { useStore } from "@tanstack/react-store";
 import { Badge } from "../components/ui/badge";
@@ -63,6 +64,7 @@ function DnsPage() {
   const values = useStore(form.store, (state) => state.values) as DnsFormValues;
   const [jsonOutput, setJsonOutput] = useState("// JSON will appear here");
   const [errors, setErrors] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
 
   const serverTags = useMemo(
     () => (values?.servers ?? []).map((s) => s.tag).filter(Boolean),
@@ -274,9 +276,9 @@ function DnsPage() {
           <Badge variant="outline">TanStack Form</Badge>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="text-lg font-semibold text-primary">DNS 路由配置</div>
+          <div className="text-lg font-semibold text-primary">DNS 配置</div>
           <p className="text-base text-muted-foreground max-w-3xl">
-            通过紧凑表格维护 DNS servers 与 rules，使用 TanStack Form 管理状态，一键生成 sing-box JSON 片段。
+            DNS servers 与 rules
           </p>
         </div>
       </div>
@@ -311,9 +313,32 @@ function DnsPage() {
                 <CardTitle>导出 JSON</CardTitle>
                 <CardDescription>转化后的 sing-box dns 片段。</CardDescription>
               </div>
-              <Button type="submit" className="h-9 px-4">
-                Generate JSON
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2"
+                  type="button"
+                  onClick={async () => {
+                    if (!jsonOutput) return;
+                    try {
+                      await navigator.clipboard.writeText(jsonOutput);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1200);
+                    } catch (error) {
+                      console.error("Copy failed", error);
+                      setCopied(false);
+                    }
+                  }}
+                  disabled={!jsonOutput}
+                >
+                  <Copy size={14} />
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+                <Button type="submit" className="h-9 px-4">
+                  Generate JSON
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="strategy" className="text-xs">

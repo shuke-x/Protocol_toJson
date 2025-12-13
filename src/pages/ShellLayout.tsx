@@ -3,8 +3,8 @@ import { cn } from "../lib/utils";
 import { Sparkles, Home, Globe2 } from "lucide-react";
 
 const navItems = [
-  { to: "/builder", label: "Protocol Builder", icon: Sparkles },
-  { to: "/dns", label: "DNS Router", icon: Globe2 },
+  { to: "/builder", label: "Protocol", icon: Sparkles },
+  { to: "/dns", label: "DNS", icon: Globe2 },
 ];
 
 function ShellLayout() {

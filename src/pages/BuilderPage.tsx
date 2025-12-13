@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useStore } from "@tanstack/react-store";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowRight, CheckCircle2, QrCode, Send, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Copy, QrCode, Send, Sparkles } from "lucide-react";
 import { protocolSchemas, type FieldDefinition, type ProtocolKey, type ProtocolSchema } from "../config";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -59,6 +59,7 @@ function BuilderPage() {
   const [jsonOutput, setJsonOutput] = useState("// JSON will appear here");
   const [qrValue, setQrValue] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     saveBuilderState({ formStates, selectedKeys, activeKey });
@@ -285,6 +286,19 @@ function BuilderPage() {
     }
   };
 
+  const onCopyJson = async () => {
+    if (!jsonOutput) return;
+    try {
+      await navigator.clipboard.writeText(jsonOutput);
+      
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch (error) {
+      console.error("Copy failed", error);
+      setCopied(false);
+    }
+  };
+
   const toggleSelection = (key: ProtocolKey) => {
     setSelectedKeys((prev) => {
       const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
@@ -485,7 +499,7 @@ function BuilderPage() {
             <CardDescription>Multi-select for batch JSON/QR export.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col py-2">
-            <ScrollArea className="flex-1 space-y-3 w-full">
+            <ScrollArea className="flex-1 space-y-3 w-full p-2">
               {protocolSchemas.map((schema) => {
                 const selected = selectedKeys.includes(schema.key);
                 const schemaErrors = errors[schema.key];
@@ -547,7 +561,7 @@ function BuilderPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col space-y-5 overflow-auto">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 p-5">
               {activeSchema.fields.map((field) => (
                 <div key={field.name} className="animate-fade-in">
                   {renderField(field)}
@@ -599,7 +613,14 @@ function BuilderPage() {
             </div>
 
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col space-y-4 overflow-auto">
+          <CardContent className="flex flex-1 flex-col space-y-4 overflow-auto px-5">
+            <div className="flex items-center justify-between ">
+              <p className="text-xs text-muted-foreground">JSON preview</p>
+              <Button variant="ghost" size="sm" className="gap-2" onClick={onCopyJson} disabled={!jsonOutput}>
+                <Copy size={14} />
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
             <div className="rounded-md border border-border/70 bg-slate-900/60 p-3 font-mono text-xs text-emerald-200 shadow-inner min-h-[200px]">
               <pre className="whitespace-pre-wrap break-words">{jsonOutput}</pre>
             </div>
