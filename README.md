@@ -15,6 +15,12 @@ Schema-driven builder that turns proxy/VPN form inputs into ready-to-use JSON (a
 3. Type check: `npm run lint`
 4. Production build: `npm run build` then `npm run preview`
 
+## Docker 部署（Nginx 监听 80）
+1. 构建镜像：`docker build -t sing-box-protocol .`
+2. 运行容器（宿主 80 → 容器 80）：`docker run -d --name sing-box-protocol -p 80:80 sing-box-protocol`
+
+说明：镜像在 Node 阶段执行 `npm ci && npm run build`，然后把 `dist` 静态资源放到 Nginx（`nginx.conf` 已配置 `try_files` 兜底到 `index.html`，适配单页路由）。
+
 ## Usage
 - Go to Builder, pick one or more protocols, and fill the fields.
 - Click **Generate JSON** or **Generate QR** to see the serialized payload.
